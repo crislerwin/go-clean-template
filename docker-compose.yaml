@@ -1,0 +1,32 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      # Descomente e ajuste para enviar traces para um OpenTelemetry Collector.
+      # - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4318
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/v1/users"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # Exemplo opcional de OpenTelemetry Collector. Descomente para coletar traces.
+  # otel-collector:
+  #   image: otel/opentelemetry-collector-contrib:latest
+  #   command: ["--config=/etc/otel-collector-config.yaml"]
+  #   volumes:
+  #     - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+  #   ports:
+  #     - "4318:4318"   # OTLP HTTP
+  #     - "4317:4317"   # OTLP gRPC
+  #     - "16686:16686" # Jaeger UI (se habilitado no collector)
+
+networks:
+  default:
+    name: go-clean-template

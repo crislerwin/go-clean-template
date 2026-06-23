@@ -8,6 +8,7 @@ import (
 
 	"github.com/crislerwin/go-clean-template/internal/domain/user"
 	"github.com/crislerwin/go-clean-template/internal/ports/input"
+	"github.com/crislerwin/go-clean-template/internal/ports/telemetry"
 )
 
 // UserHandler é o adapter HTTP. Ele converte requisições/respostas
@@ -18,17 +19,20 @@ type UserHandler struct {
 	createUserUC input.CreateUserUseCase
 	findUserUC   input.FindUserByIDUseCase
 	listUsersUC  input.ListUsersUseCase
+	tracer       telemetry.Tracer
 }
 
 func NewUserHandler(
 	create input.CreateUserUseCase,
 	find input.FindUserByIDUseCase,
 	list input.ListUsersUseCase,
+	tracer telemetry.Tracer,
 ) *UserHandler {
 	return &UserHandler{
 		createUserUC: create,
 		findUserUC:   find,
 		listUsersUC:  list,
+		tracer:       tracer,
 	}
 }
 
@@ -39,54 +43,74 @@ func (h *UserHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
+	ctx, span := h.tracer.Start(r.Context(), "HTTP.CreateUser")
+	defer span.End()
+
 	var req input.CreateUserInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		span.RecordError(err)
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
 
 	if err := validateCreateInput(req); err != nil {
+		span.RecordError(err)
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
 
 	output, err := h.createUserUC.Execute(req)
 	if err != nil {
+		span.RecordError(err)
 		respondJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
 		return
 	}
 
 	respondJSON(w, http.StatusCreated, output)
+	_ = ctx
 }
 
 func (h *UserHandler) findUserByID(w http.ResponseWriter, r *http.Request) {
+	ctx, span := h.tracer.Start(r.Context(), "HTTP.FindUserByID")
+	defer span.End()
+
 	id := r.PathValue("id")
 	if strings.TrimSpace(id) == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "id is required"})
+		err := errors.New("id is required")
+		span.RecordError(err)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
 
 	output, err := h.findUserUC.Execute(input.FindUserByIDInput{ID: id})
 	if errors.Is(err, user.ErrUserNotFound) {
+		span.RecordError(err)
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
 		return
 	}
 	if err != nil {
+		span.RecordError(err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 
 	respondJSON(w, http.StatusOK, output)
+	_ = ctx
 }
 
 func (h *UserHandler) listUsers(w http.ResponseWriter, r *http.Request) {
+	ctx, span := h.tracer.Start(r.Context(), "HTTP.ListUsers")
+	defer span.End()
+
 	output, err := h.listUsersUC.Execute()
 	if err != nil {
+		span.RecordError(err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 
 	respondJSON(w, http.StatusOK, output)
+	_ = ctx
 }
 
 func validateCreateInput(req input.CreateUserInput) error {
