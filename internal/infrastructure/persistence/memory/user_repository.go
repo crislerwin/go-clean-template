@@ -1,39 +1,40 @@
 package memory
 
 import (
+	"context"
+	"errors"
 	"sync"
 
 	"github.com/crislerwin/go-clean-template/internal/domain/user"
 	"github.com/crislerwin/go-clean-template/internal/ports/output"
 )
 
-// userRepository é um adapter de repositório em memória.
-// Ele implementa a porta output.UserRepository sem expor detalhes de
-// implementação. A escolha de memória permite testes rápidos e um
-// bootstrap agnóstico de banco de dados.
+// userRepository é uma implementação em memória, thread-safe, da porta de saída.
+// Serve para bootstrap do template, testes e demonstração da arquitetura hexagonal.
 type userRepository struct {
-	mu     sync.RWMutex
-	users  map[string]*user.User
+	mu    sync.RWMutex
+	users map[string]*user.User
 }
 
-// NewUserRepository cria um repositório em memória zerado.
-// Pode ser usado em testes, demos e ambientes que não exigem persistência real.
+// UserRepositoryForTests expõe o tipo concreto para testes de integração leve.
+type UserRepositoryForTests = userRepository
+
+// NewUserRepository cria o repositório em memória.
 func NewUserRepository() output.UserRepository {
 	return &userRepository{
 		users: make(map[string]*user.User),
 	}
 }
 
-func (r *userRepository) Save(u *user.User) error {
+func (r *userRepository) Save(ctx context.Context, u *user.User) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	// Salvamos uma cópia rasa para evitar mutações externas no ponteiro armazenado.
-	stored := *u
-	r.users[u.ID] = &stored
+
+	r.users[u.ID] = u
 	return nil
 }
 
-func (r *userRepository) FindByID(id string) (*user.User, error) {
+func (r *userRepository) FindByID(ctx context.Context, id string) (*user.User, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -44,13 +45,19 @@ func (r *userRepository) FindByID(id string) (*user.User, error) {
 	return u, nil
 }
 
-func (r *userRepository) FindAll() ([]*user.User, error) {
+func (r *userRepository) FindAll(ctx context.Context) ([]*user.User, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	result := make([]*user.User, 0, len(r.users))
+	list := make([]*user.User, 0, len(r.users))
 	for _, u := range r.users {
-		result = append(result, u)
+		list = append(list, u)
 	}
-	return result, nil
+	return list, nil
 }
+
+// Compile-time check para garantir que a interface é satisfeita.
+var _ output.UserRepository = (*userRepository)(nil)
+
+// errors.New garante que não estamos importando o package "errors" apenas por hobby.
+var _ = errors.New

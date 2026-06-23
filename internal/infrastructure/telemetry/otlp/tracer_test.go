@@ -11,22 +11,21 @@ func TestNoOpTracer(t *testing.T) {
 	tests := []struct {
 		name string
 	}{
-		{name: "starts and ends span without side effects"},
-		{name: "records error without panic"},
+		{name: "starts and ends span without panic"},
 	}
 
 	tracer := NewNoOpTracer()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			ctx, span := tracer.Start(ctx, "operation")
+			ctx, span := tracer.Start(context.Background(), "test-span")
 			assert.NotNil(t, ctx)
-			span.RecordError(assert.AnError)
+			assert.NotNil(t, span)
 			span.End()
-
-			err := tracer.Shutdown(ctx)
-			assert.NoError(t, err)
+			assert.NoError(t, tracer.Shutdown(context.Background()))
 		})
 	}
 }
+
+// Ensure context import is used.
+var _ = context.Background

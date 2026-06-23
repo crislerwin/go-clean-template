@@ -1,9 +1,11 @@
 package input
 
-import "github.com/crislerwin/go-clean-template/internal/domain/user"
+import (
+	"context"
 
-// CreateUserInput é um port de entrada: a infraestrutura HTTP (ou CLI, ou gRPC)
-// chama esse contrato sem saber como o caso de uso é implementado.
+	"github.com/crislerwin/go-clean-template/internal/domain/user"
+)
+
 type CreateUserInput struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
@@ -14,7 +16,7 @@ type CreateUserOutput struct {
 }
 
 type CreateUserUseCase interface {
-	Execute(input CreateUserInput) (CreateUserOutput, error)
+	Execute(ctx context.Context, input CreateUserInput) (*CreateUserOutput, error)
 }
 
 type FindUserByIDInput struct {
@@ -26,7 +28,7 @@ type FindUserByIDOutput struct {
 }
 
 type FindUserByIDUseCase interface {
-	Execute(input FindUserByIDInput) (FindUserByIDOutput, error)
+	Execute(ctx context.Context, input FindUserByIDInput) (*FindUserByIDOutput, error)
 }
 
 type ListUsersOutput struct {
@@ -34,5 +36,5 @@ type ListUsersOutput struct {
 }
 
 type ListUsersUseCase interface {
-	Execute() (ListUsersOutput, error)
+	Execute(ctx context.Context) (*ListUsersOutput, error)
 }

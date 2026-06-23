@@ -1,13 +1,16 @@
 package output
 
-import "github.com/crislerwin/go-clean-template/internal/domain/user"
+import (
+	"context"
 
-// UserRepository é a porta de saída do domínio.
-// A aplicação diz "preciso de alguém que consiga salvar e recuperar usuários",
-// mas não se importa se é PostgreSQL, MongoDB ou memória.
-// Isso mantém o domínio livre de detalhes de infraestrutura.
+	"github.com/crislerwin/go-clean-template/internal/domain/user"
+)
+
+// UserRepository define o contrato de persistência da aplicação.
+// Qualquer adapter de banco de dados (memory, postgres, mongo) deve implementá-lo.
+// A aplicação depende dessa interface, não de tecnologias concretas.
 type UserRepository interface {
-	Save(u *user.User) error
-	FindByID(id string) (*user.User, error)
-	FindAll() ([]*user.User, error)
+	Save(ctx context.Context, user *user.User) error
+	FindByID(ctx context.Context, id string) (*user.User, error)
+	FindAll(ctx context.Context) ([]*user.User, error)
 }

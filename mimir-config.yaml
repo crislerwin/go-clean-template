@@ -1,0 +1,23 @@
+common:
+  storage:
+    backend: filesystem
+    filesystem:
+      dir: /data/storage
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+  tsdb:
+    dir: /data/tsdb
+
+compactor:
+  data_dir: /data/compactor
+
+limits:
+  ingestion_rate: 10000
+  ingestion_burst_size: 20000
+
+server:
+  http_listen_port: 9009
+  grpc_listen_port: 9094

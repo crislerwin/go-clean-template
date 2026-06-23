@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 
 	"github.com/crislerwin/go-clean-template/internal/domain/user"
 	inputports "github.com/crislerwin/go-clean-template/internal/ports/input"
@@ -10,79 +11,91 @@ import (
 )
 
 // createUserUseCase orquestra a criação de um usuário.
-// A lógica de negócio vive no domínio (NewUser); o caso de uso coordena
-// persistência e mapeamento entre DTOs de entrada e entidades.
 type createUserUseCase struct {
 	repo   output.UserRepository
-	tracer telemetry.Tracer
+	logger telemetry.Logger
 }
 
-// NewCreateUserUseCase expõe a porta de entrada e esconde a implementação.
-// O tipo concreto permanece não exportado para garantir acoplamento à interface.
-func NewCreateUserUseCase(repo output.UserRepository, tracer telemetry.Tracer) inputports.CreateUserUseCase {
-	return &createUserUseCase{repo: repo, tracer: tracer}
+// NewCreateUserUseCase cria o caso de uso com as dependências necessárias.
+func NewCreateUserUseCase(repo output.UserRepository, logger telemetry.Logger) inputports.CreateUserUseCase {
+	return &createUserUseCase{
+		repo:   repo,
+		logger: logger.With("usecase", "CreateUser"),
+	}
 }
 
-func (uc *createUserUseCase) Execute(input inputports.CreateUserInput) (inputports.CreateUserOutput, error) {
-	_, span := uc.tracer.Start(context.Background(), "CreateUserUseCase.Execute")
-	defer span.End()
+func (uc *createUserUseCase) Execute(ctx context.Context, input inputports.CreateUserInput) (*inputports.CreateUserOutput, error) {
+	uc.logger.Info(ctx, "executing create user use case", "email", input.Email)
 
 	u, err := user.NewUser(input.Name, input.Email)
 	if err != nil {
-		span.RecordError(err)
-		return inputports.CreateUserOutput{}, err
+		uc.logger.Error(ctx, "failed to build user entity", "error", err)
+		return nil, err
 	}
 
-	if err := uc.repo.Save(u); err != nil {
-		span.RecordError(err)
-		return inputports.CreateUserOutput{}, err
+	if err := uc.repo.Save(ctx, u); err != nil {
+		uc.logger.Error(ctx, "failed to save user", "error", err)
+		return nil, err
 	}
 
-	return inputports.CreateUserOutput{User: u}, nil
+	uc.logger.Info(ctx, "user created successfully", "user_id", u.ID)
+	return &inputports.CreateUserOutput{User: u}, nil
 }
 
-// findUserByIDUseCase orquestra a busca por ID.
+// findUserByIDUseCase busca um usuário pelo ID.
 type findUserByIDUseCase struct {
 	repo   output.UserRepository
-	tracer telemetry.Tracer
+	logger telemetry.Logger
 }
 
-func NewFindUserByIDUseCase(repo output.UserRepository, tracer telemetry.Tracer) inputports.FindUserByIDUseCase {
-	return &findUserByIDUseCase{repo: repo, tracer: tracer}
+// NewFindUserByIDUseCase cria o caso de uso de busca.
+func NewFindUserByIDUseCase(repo output.UserRepository, logger telemetry.Logger) inputports.FindUserByIDUseCase {
+	return &findUserByIDUseCase{
+		repo:   repo,
+		logger: logger.With("usecase", "FindUserByID"),
+	}
 }
 
-func (uc *findUserByIDUseCase) Execute(input inputports.FindUserByIDInput) (inputports.FindUserByIDOutput, error) {
-	_, span := uc.tracer.Start(context.Background(), "FindUserByIDUseCase.Execute")
-	defer span.End()
+func (uc *findUserByIDUseCase) Execute(ctx context.Context, input inputports.FindUserByIDInput) (*inputports.FindUserByIDOutput, error) {
+	uc.logger.Info(ctx, "executing find user by id use case", "user_id", input.ID)
 
-	u, err := uc.repo.FindByID(input.ID)
+	u, err := uc.repo.FindByID(ctx, input.ID)
 	if err != nil {
-		span.RecordError(err)
-		return inputports.FindUserByIDOutput{}, err
+		if errors.Is(err, user.ErrUserNotFound) {
+			uc.logger.Warn(ctx, "user not found", "user_id", input.ID)
+		} else {
+			uc.logger.Error(ctx, "failed to find user", "error", err)
+		}
+		return nil, err
 	}
 
-	return inputports.FindUserByIDOutput{User: u}, nil
+	uc.logger.Info(ctx, "user found", "user_id", u.ID)
+	return &inputports.FindUserByIDOutput{User: u}, nil
 }
 
-// listUsersUseCase orquestra a listagem.
+// listUsersUseCase lista todos os usuários.
 type listUsersUseCase struct {
 	repo   output.UserRepository
-	tracer telemetry.Tracer
+	logger telemetry.Logger
 }
 
-func NewListUsersUseCase(repo output.UserRepository, tracer telemetry.Tracer) inputports.ListUsersUseCase {
-	return &listUsersUseCase{repo: repo, tracer: tracer}
+// NewListUsersUseCase cria o caso de uso de listagem.
+func NewListUsersUseCase(repo output.UserRepository, logger telemetry.Logger) inputports.ListUsersUseCase {
+	return &listUsersUseCase{
+		repo:   repo,
+		logger: logger.With("usecase", "ListUsers"),
+	}
 }
 
-func (uc *listUsersUseCase) Execute() (inputports.ListUsersOutput, error) {
-	_, span := uc.tracer.Start(context.Background(), "ListUsersUseCase.Execute")
-	defer span.End()
+func (uc *listUsersUseCase) Execute(ctx context.Context) (*inputports.ListUsersOutput, error) {
+	uc.logger.Info(ctx, "executing list users use case")
 
-	users, err := uc.repo.FindAll()
+	users, err := uc.repo.FindAll(ctx)
 	if err != nil {
-		span.RecordError(err)
-		return inputports.ListUsersOutput{}, err
+		uc.logger.Error(ctx, "failed to list users", "error", err)
+		return nil, err
 	}
 
-	return inputports.ListUsersOutput{Users: users}, nil
+	uc.logger.Info(ctx, "users listed", "count", len(users))
+	return &inputports.ListUsersOutput{Users: users}, nil
 }

@@ -1,61 +1,95 @@
 package memory
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/crislerwin/go-clean-template/internal/domain/user"
+	"github.com/crislerwin/go-clean-template/internal/ports/output"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestUserRepository_Save_FindByID_FindAll(t *testing.T) {
+func TestUserRepository_SaveAndFind(t *testing.T) {
 	tests := []struct {
-		name  string
-		users []*user.User
+		name    string
+		setup   func(repo output.UserRepository)
+		id      string
+		wantErr bool
 	}{
 		{
-			name: "saves and retrieves multiple users",
-			users: []*user.User{
-				mustCreateUser(t, "Margaret Hamilton", "margaret@example.com"),
-				mustCreateUser(t, "Donald Knuth", "donald@example.com"),
+			name: "finds saved user",
+			setup: func(repo output.UserRepository) {
+				u, _ := user.NewUser("Alan Turing", "alan@example.com")
+				_ = repo.Save(context.Background(), u)
 			},
+			wantErr: false,
 		},
 		{
-			name:  "handles empty repository",
-			users: []*user.User{},
+			name:    "returns error for missing user",
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := NewUserRepository()
-
-			for _, u := range tt.users {
-				require.NoError(t, repo.Save(u))
+			if tt.setup != nil {
+				tt.setup(repo)
+				users, _ := repo.FindAll(context.Background())
+				tt.id = users[0].ID
+			} else {
+				tt.id = "missing-id"
 			}
 
-			all, err := repo.FindAll()
-			require.NoError(t, err)
-			assert.Len(t, all, len(tt.users))
+			found, err := repo.FindByID(context.Background(), tt.id)
 
-			for _, u := range tt.users {
-				found, err := repo.FindByID(u.ID)
-				require.NoError(t, err)
-				assert.Equal(t, u.ID, found.ID)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.True(t, errors.Is(err, user.ErrUserNotFound))
+				return
 			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, found)
+			assert.Equal(t, tt.id, found.ID)
 		})
 	}
 }
 
-func TestUserRepository_FindByID_NotFound(t *testing.T) {
-	repo := NewUserRepository()
-	_, err := repo.FindByID("missing-id")
-	assert.ErrorIs(t, err, user.ErrUserNotFound)
-}
+func TestUserRepository_FindAll(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     func(repo output.UserRepository)
+		wantCount int
+	}{
+		{
+			name:      "empty repository returns empty list",
+			wantCount: 0,
+		},
+		{
+			name: "returns all saved users",
+			setup: func(repo output.UserRepository) {
+				u1, _ := user.NewUser("Alan Turing", "alan@example.com")
+				u2, _ := user.NewUser("Grace Hopper", "grace@example.com")
+				_ = repo.Save(context.Background(), u1)
+				_ = repo.Save(context.Background(), u2)
+			},
+			wantCount: 2,
+		},
+	}
 
-func mustCreateUser(t *testing.T, name, email string) *user.User {
-	t.Helper()
-	u, err := user.NewUser(name, email)
-	require.NoError(t, err)
-	return u
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := NewUserRepository()
+			if tt.setup != nil {
+				tt.setup(repo)
+			}
+
+			users, err := repo.FindAll(context.Background())
+
+			assert.NoError(t, err)
+			assert.Len(t, users, tt.wantCount)
+		})
+	}
 }

@@ -1,0 +1,89 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "Loki"
+          },
+          "expr": "{container=\"go-clean-template-api-1\"} | json | line_format \"{{.msg}}\"",
+          "refId": "A"
+        }
+      ],
+      "title": "API Logs",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "tempo",
+        "uid": "Tempo"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "Tempo"
+          },
+          "query": "{\"service.name\":\"go-clean-template\"}",
+          "refId": "B"
+        }
+      ],
+      "title": "Distributed Traces",
+      "type": "traces"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "tags": ["lgtm", "go-clean-template"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "go-clean-template LGTM",
+  "uid": "go-clean-template-lgtm",
+  "version": 1,
+  "weekStart": ""
+}

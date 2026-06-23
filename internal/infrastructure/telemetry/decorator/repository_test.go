@@ -1,83 +1,61 @@
 package decorator
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/crislerwin/go-clean-template/internal/domain/user"
+	logger "github.com/crislerwin/go-clean-template/internal/infrastructure/logger/slog"
 	"github.com/crislerwin/go-clean-template/internal/infrastructure/persistence/memory"
 	"github.com/crislerwin/go-clean-template/internal/infrastructure/telemetry/otlp"
+	"github.com/crislerwin/go-clean-template/internal/ports/output"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestTracedRepository(t *testing.T) {
+func TestTracedRepository_PropagatesContext(t *testing.T) {
 	tests := []struct {
-		name      string
-		operation func(repo userRepo) error
-		wantError error
+		name string
+		fn   func(repo output.UserRepository) error
 	}{
 		{
-			name: "traces save successfully",
-			operation: func(repo userRepo) error {
-				u, _ := user.NewUser("Test User", "test@example.com")
-				return repo.Save(u)
+			name: "save",
+			fn: func(repo output.UserRepository) error {
+				u, _ := user.NewUser("Test", "test@example.com")
+				return repo.Save(context.Background(), u)
 			},
 		},
 		{
-			name: "traces find by id with not found",
-			operation: func(repo userRepo) error {
-				_, err := repo.FindByID("missing-id")
+			name: "find by id",
+			fn: func(repo output.UserRepository) error {
+				_, err := repo.FindByID(context.Background(), "any-id")
 				return err
 			},
-			wantError: user.ErrUserNotFound,
 		},
 		{
-			name: "traces find all",
-			operation: func(repo userRepo) error {
-				_, err := repo.FindAll()
+			name: "find all",
+			fn: func(repo output.UserRepository) error {
+				_, err := repo.FindAll(context.Background())
 				return err
 			},
 		},
 	}
+
+	tracer := otlp.NewNoOpTracer()
+	logger := logger.NewSlogLogger(nil, "INFO")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			base := memory.NewUserRepository()
-			tracer := otlp.NewNoOpTracer()
-			repo := NewTracedRepository(base, tracer)
+			repo := NewTracedRepository(base, tracer, logger)
 
-			err := tt.operation(repo)
+			err := tt.fn(repo)
 
-			if tt.wantError != nil {
-				require.ErrorIs(t, err, tt.wantError)
+			if tt.name == "find by id" {
+				assert.True(t, errors.Is(err, user.ErrUserNotFound))
 				return
 			}
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		})
 	}
-}
-
-// userRepo expõe apenas os métodos usados no teste para simplificar.
-type userRepo interface {
-	Save(u *user.User) error
-	FindByID(id string) (*user.User, error)
-	FindAll() ([]*user.User, error)
-}
-
-// Sanity check: tracedRepository realmente implementa output.UserRepository.
-var _ userRepo = (&tracedRepository{})
-
-func TestTracedRepository_RecordsError(t *testing.T) {
-	base := memory.NewUserRepository()
-	tracer := otlp.NewNoOpTracer()
-	repo := NewTracedRepository(base, tracer)
-
-	// Salva um usuário válido primeiro para garantir sucesso no save.
-	u, err := user.NewUser("Tracer Test", "tracer@example.com")
-	require.NoError(t, err)
-	require.NoError(t, repo.Save(u))
-
-	// Força FindByID a retornar erro sem depender de estado.
-	_, err = repo.FindByID("does-not-exist")
-	assert.ErrorIs(t, err, user.ErrUserNotFound)
 }
