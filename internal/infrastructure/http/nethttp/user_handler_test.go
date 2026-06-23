@@ -9,6 +9,7 @@ import (
 
 	"github.com/crislerwin/go-clean-template/internal/application/user"
 	"github.com/crislerwin/go-clean-template/internal/infrastructure/persistence/memory"
+	"github.com/crislerwin/go-clean-template/internal/infrastructure/telemetry/otlp"
 	"github.com/crislerwin/go-clean-template/internal/ports/input"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,10 +19,11 @@ import (
 // Regras de negócio já foram testadas nos níveis internos.
 func TestUserHandler(t *testing.T) {
 	repo := memory.NewUserRepository()
-	createUC := user.NewCreateUserUseCase(repo)
-	findUC := user.NewFindUserByIDUseCase(repo)
-	listUC := user.NewListUsersUseCase(repo)
-	handler := NewUserHandler(createUC, findUC, listUC)
+	tracer := otlp.NewNoOpTracer()
+	createUC := user.NewCreateUserUseCase(repo, tracer)
+	findUC := user.NewFindUserByIDUseCase(repo, tracer)
+	listUC := user.NewListUsersUseCase(repo, tracer)
+	handler := NewUserHandler(createUC, findUC, listUC, tracer)
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
@@ -58,14 +60,24 @@ func TestUserHandler(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Contains(t, rec.Body.String(), "users")
 	})
+	t.Run("returns health status", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/health", nil)
+		rec := httptest.NewRecorder()
+
+		mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "healthy")
+	})
 }
 
 func TestUserHandler_FindByID(t *testing.T) {
 	repo := memory.NewUserRepository()
-	createUC := user.NewCreateUserUseCase(repo)
-	findUC := user.NewFindUserByIDUseCase(repo)
-	listUC := user.NewListUsersUseCase(repo)
-	handler := NewUserHandler(createUC, findUC, listUC)
+	tracer := otlp.NewNoOpTracer()
+	createUC := user.NewCreateUserUseCase(repo, tracer)
+	findUC := user.NewFindUserByIDUseCase(repo, tracer)
+	listUC := user.NewListUsersUseCase(repo, tracer)
+	handler := NewUserHandler(createUC, findUC, listUC, tracer)
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)

@@ -1,0 +1,30 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+
+exporters:
+  # Exemplo local: envia traces para stdout.
+  # Para enviar a um backend real, descomente e configure Jaeger/Zipkin/OTLP abaixo.
+  logging:
+    loglevel: debug
+
+  # Exemplo Jaeger (requer serviço jaeger-all-in-one na rede):
+  # otlp/jaeger:
+  #   endpoint: jaeger:4317
+  #   tls:
+  #     insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging]
+      # Para Jaeger, troque exporters para: [otlp/jaeger]

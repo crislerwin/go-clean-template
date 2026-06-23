@@ -5,13 +5,14 @@ import (
 
 	"github.com/crislerwin/go-clean-template/internal/domain/user"
 	"github.com/crislerwin/go-clean-template/internal/infrastructure/persistence/memory"
+	"github.com/crislerwin/go-clean-template/internal/infrastructure/telemetry/otlp"
 	"github.com/crislerwin/go-clean-template/internal/ports/input"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// Testes de aplicação usam o repositório em memória para provar que
-// o caso de uso funciona independentemente de tecnologia de banco.
+// Testes de aplicação usam o repositório em memória e um tracer no-op
+// para provar que o caso de uso funciona independentemente de tecnologia.
 func TestCreateUserUseCase_Execute(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -32,7 +33,8 @@ func TestCreateUserUseCase_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := memory.NewUserRepository()
-			uc := NewCreateUserUseCase(repo)
+			tracer := otlp.NewNoOpTracer()
+			uc := NewCreateUserUseCase(repo, tracer)
 
 			output, err := uc.Execute(tt.input)
 
@@ -46,7 +48,6 @@ func TestCreateUserUseCase_Execute(t *testing.T) {
 			assert.Equal(t, tt.input.Name, output.User.Name)
 			assert.Equal(t, tt.input.Email, output.User.Email)
 
-			// Verifica que o usuário realmente foi salvo.
 			found, err := repo.FindByID(output.User.ID)
 			require.NoError(t, err)
 			assert.Equal(t, output.User.ID, found.ID)
@@ -56,11 +57,12 @@ func TestCreateUserUseCase_Execute(t *testing.T) {
 
 func TestFindUserByIDUseCase_Execute(t *testing.T) {
 	repo := memory.NewUserRepository()
+	tracer := otlp.NewNoOpTracer()
 	created, err := user.NewUser("Tim Berners-Lee", "tim@example.com")
 	require.NoError(t, err)
 	require.NoError(t, repo.Save(created))
 
-	uc := NewFindUserByIDUseCase(repo)
+	uc := NewFindUserByIDUseCase(repo, tracer)
 
 	output, err := uc.Execute(input.FindUserByIDInput{ID: created.ID})
 	require.NoError(t, err)
@@ -72,7 +74,8 @@ func TestFindUserByIDUseCase_Execute(t *testing.T) {
 
 func TestListUsersUseCase_Execute(t *testing.T) {
 	repo := memory.NewUserRepository()
-	uc := NewListUsersUseCase(repo)
+	tracer := otlp.NewNoOpTracer()
+	uc := NewListUsersUseCase(repo, tracer)
 
 	output, err := uc.Execute()
 	require.NoError(t, err)
