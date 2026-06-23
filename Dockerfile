@@ -18,11 +18,13 @@ FROM alpine:3.20
 
 WORKDIR /app
 
+# Install curl for healthchecks and ca-certificates for TLS endpoints.
+RUN apk add --no-cache curl ca-certificates
+
 # Create non-root user for security.
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 COPY --from=builder /bin/server /app/server
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 USER appuser
 
@@ -31,6 +33,6 @@ EXPOSE 8080
 ENV PORT=8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/v1/users || exit 1
+  CMD curl -f http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["./server"]

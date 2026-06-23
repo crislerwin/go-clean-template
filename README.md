@@ -101,6 +101,22 @@ Derrubar:
 make docker-compose-down
 ```
 
+### Healthcheck
+
+A API expõe um endpoint de saúde independente da lógica de negócio:
+
+```bash
+curl http://localhost:8080/health
+```
+
+Resposta:
+
+```json
+{"status":"healthy"}
+```
+
+Esse endpoint é usado pelo Dockerfile e pelo docker-compose para verificar readiness/liveness.
+
 ### OpenTelemetry
 
 Para enviar traces, descomente o serviço `otel-collector` em `docker-compose.yaml` e exporte:
@@ -109,6 +125,16 @@ Para enviar traces, descomente o serviço `otel-collector` em `docker-compose.ya
 export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4318
 make run
 ```
+
+Para forçar TLS em produção, defina `OTEL_INSECURE=false`:
+
+```bash
+export OTEL_INSECURE=false
+export OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector.example.com:4318
+make run
+```
+
+Sem a variável `OTEL_EXPORTER_OTLP_ENDPOINT`, o tracer opera em modo no-op. Se o exporter falhar ao inicializar, a aplicação loga um aviso e continua com no-op.
 
 Sem essa variável, o tracer opera em modo no-op.
 
@@ -137,5 +163,7 @@ Sem essa variável, o tracer opera em modo no-op.
 - **Injeção manual de dependências**: sem magic frameworks, fácil de testar e entender.
 - **Erros de domínio exportados**: adapters podem reagir de forma diferente (`404` para `ErrUserNotFound`, por exemplo) sem vazar lógica de negócio.
 - **OpenTelemetry como port**: o domínio/caso de uso dependem apenas de `telemetry.Tracer`, não do SDK OTel.
+- **OpenTelemetry resiliente**: falha no exporter cai para no-op; TLS configurável via `OTEL_INSECURE`.
+- **Endpoint `/health` dedicado**: healthcheck desacoplado da lógica de negócio.
 - **Dockerfile multi-stage**: imagem pequena, sem ferramentas de build em runtime, rodando com usuário não-root.
-- **Healthcheck no Dockerfile**: permite orquestradores verificarem a saúde do container.
+- **Healthcheck no Dockerfile e Compose**: aponta para `/health`.

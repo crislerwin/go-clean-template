@@ -40,10 +40,11 @@ func (h *UserHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/users", h.createUser)
 	mux.HandleFunc("GET /api/v1/users/{id}", h.findUserByID)
 	mux.HandleFunc("GET /api/v1/users", h.listUsers)
+	mux.HandleFunc("GET /health", h.healthCheck)
 }
 
 func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
-	ctx, span := h.tracer.Start(r.Context(), "HTTP.CreateUser")
+	_, span := h.tracer.Start(r.Context(), "HTTP.CreateUser")
 	defer span.End()
 
 	var req input.CreateUserInput
@@ -67,11 +68,10 @@ func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusCreated, output)
-	_ = ctx
 }
 
 func (h *UserHandler) findUserByID(w http.ResponseWriter, r *http.Request) {
-	ctx, span := h.tracer.Start(r.Context(), "HTTP.FindUserByID")
+	_, span := h.tracer.Start(r.Context(), "HTTP.FindUserByID")
 	defer span.End()
 
 	id := r.PathValue("id")
@@ -95,11 +95,10 @@ func (h *UserHandler) findUserByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, output)
-	_ = ctx
 }
 
 func (h *UserHandler) listUsers(w http.ResponseWriter, r *http.Request) {
-	ctx, span := h.tracer.Start(r.Context(), "HTTP.ListUsers")
+	_, span := h.tracer.Start(r.Context(), "HTTP.ListUsers")
 	defer span.End()
 
 	output, err := h.listUsersUC.Execute()
@@ -110,7 +109,13 @@ func (h *UserHandler) listUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, output)
-	_ = ctx
+}
+
+// healthCheck expõe um endpoint simples de readiness/liveness.
+// Ele não depende de repositório ou lógica de negócio, apenas confirma
+// que o servidor HTTP está aceitando conexões.
+func (h *UserHandler) healthCheck(w http.ResponseWriter, r *http.Request) {
+	respondJSON(w, http.StatusOK, map[string]string{"status": "healthy"})
 }
 
 func validateCreateInput(req input.CreateUserInput) error {

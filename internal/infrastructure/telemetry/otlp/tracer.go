@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -38,23 +39,39 @@ type otelTracer struct {
 	provider *sdktrace.TracerProvider
 }
 
-// NewOTelTracer cria o tracer. Se OTEL_EXPORTER_OTLP_ENDPOINT estiver vazio,
-// retorna um NoOpTracer para não quebrar execução local.
+// NewOTelTracer cria o tracer.
+//
+// Comportamento:
+//   - Se OTEL_EXPORTER_OTLP_ENDPOINT estiver vazio, retorna NoOpTracer.
+//   - Se a inicialização do exporter falhar, retorna NoOpTracer para manter
+//     a aplicação resiliente (escolha de resiliência sobre rigidez).
+//   - TLS é controlado por OTEL_INSECURE: true (padrão) usa WithInsecure();
+//     false exige TLS via WithSecure().
 func NewOTelTracer(serviceName string) (telemetry.Tracer, error) {
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
 		return NewNoOpTracer(), nil
 	}
 
+	insecure, err := strconv.ParseBool(os.Getenv("OTEL_INSECURE"))
+	if err != nil {
+		// Padrão do template é insecure=true para facilitar desenvolvimento local.
+		insecure = true
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	exporter, err := otlptracehttp.New(ctx,
+	opts := []otlptracehttp.Option{
 		otlptracehttp.WithEndpoint(endpoint),
-		otlptracehttp.WithInsecure(),
-	)
+	}
+	if insecure {
+		opts = append(opts, otlptracehttp.WithInsecure())
+	}
+
+	exporter, err := otlptracehttp.New(ctx, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create otel exporter: %w", err)
+		return NewNoOpTracer(), fmt.Errorf("failed to create otel exporter, falling back to no-op: %w", err)
 	}
 
 	res, err := resource.New(ctx,
@@ -64,7 +81,7 @@ func NewOTelTracer(serviceName string) (telemetry.Tracer, error) {
 		),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create otel resource: %w", err)
+		return NewNoOpTracer(), fmt.Errorf("failed to create otel resource, falling back to no-op: %w", err)
 	}
 
 	provider := sdktrace.NewTracerProvider(

@@ -60,6 +60,15 @@ func TestUserHandler(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Contains(t, rec.Body.String(), "users")
 	})
+	t.Run("returns health status", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/health", nil)
+		rec := httptest.NewRecorder()
+
+		mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "healthy")
+	})
 }
 
 func TestUserHandler_FindByID(t *testing.T) {

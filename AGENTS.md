@@ -32,12 +32,15 @@ Template minimalista para APIs Go seguindo Clean Architecture, DDD e Ports and A
 - Escolha a implementação mais simples e agnóstica possível.
 - Só adicione dependência externa (PostgreSQL, Redis, etc.) quando houver requisito real.
 - O adapter HTTP padrão usa `net/http` para demonstrar que frameworks são substituíveis.
-- OpenTelemetry é opcional: se `OTEL_EXPORTER_OTLP_ENDPOINT` não estiver configurado, o sistema usa um tracer no-op.
+- OpenTelemetry é opcional: se `OTEL_EXPORTER_OTLP_ENDPOINT` não estiver configurado, o sistema usa no-op.
+- TLS do OTLP é configurável via `OTEL_INSECURE` (`true` por padrão para desenvolvimento; `false` força TLS).
+- Se a inicialização do exporter OTel falhar, a aplicação inicia com tracer no-op (resiliência sobre rigidez).
 
 ### 6. Docker First
 
 - A aplicação deve rodar com `docker compose up` sem necessidade de banco externo.
-- Dockerfile multi-stage com usuário não-root e healthcheck.
+- Dockerfile multi-stage com usuário não-root e healthcheck apontando para `/health`.
+- O endpoint `/health` não deve depender de lógica de negócio.
 
 ## Commands
 

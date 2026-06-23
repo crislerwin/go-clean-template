@@ -21,11 +21,12 @@ import (
 // Repositório em memória é usado por padrão, mantendo o template
 // agnóstico de banco de dados e pronto para rodar sem infra externa.
 // OpenTelemetry é carregado de forma opcional: se OTEL_EXPORTER_OTLP_ENDPOINT
-// não estiver definido, o tracer no-op é usado e a aplicação continua funcionando.
+// não estiver definido, o tracer no-op é usado. Em caso de falha na
+// inicialização do exporter, logamos um aviso e continuamos com no-op.
 func main() {
 	tracer, err := otlp.NewOTelTracer("go-clean-template")
 	if err != nil {
-		log.Fatalf("failed to initialize tracer: %v", err)
+		log.Printf("warning: %v", err)
 	}
 
 	userRepo := memory.NewUserRepository()
