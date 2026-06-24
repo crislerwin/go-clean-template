@@ -9,49 +9,59 @@ import (
 )
 
 // tracedRepository decora um UserRepository para criar spans de tracing.
-// É um adapter que implementa output.UserRepository e demonstra como
-// infraestrutura transversal (observabilidade) pode ser adicionada sem
-// alterar domínio ou casos de uso.
+// É um adapter que adiciona observabilidade sem alterar a interface que a aplicação vê.
 type tracedRepository struct {
 	repo   output.UserRepository
 	tracer telemetry.Tracer
+	logger telemetry.Logger
 }
 
-func NewTracedRepository(repo output.UserRepository, tracer telemetry.Tracer) output.UserRepository {
-	return &tracedRepository{repo: repo, tracer: tracer}
-}
-
-func (r *tracedRepository) Save(u *user.User) error {
-	_, span := r.tracer.Start(context.Background(), "UserRepository.Save")
-	defer span.End()
-
-	if err := r.repo.Save(u); err != nil {
-		span.RecordError(err)
-		return err
+// NewTracedRepository envolve um repositório com tracing.
+func NewTracedRepository(repo output.UserRepository, tracer telemetry.Tracer, logger telemetry.Logger) output.UserRepository {
+	return &tracedRepository{
+		repo:   repo,
+		tracer: tracer,
+		logger: logger.With("component", "tracedRepository"),
 	}
-	return nil
 }
 
-func (r *tracedRepository) FindByID(id string) (*user.User, error) {
-	_, span := r.tracer.Start(context.Background(), "UserRepository.FindByID")
+func (t *tracedRepository) Save(ctx context.Context, u *user.User) error {
+	ctx, span := t.tracer.Start(ctx, "UserRepository.Save")
 	defer span.End()
 
-	u, err := r.repo.FindByID(id)
+	t.logger.Info(ctx, "saving user", "user_id", u.ID)
+	err := t.repo.Save(ctx, u)
 	if err != nil {
 		span.RecordError(err)
-		return nil, err
+		t.logger.Error(ctx, "failed to save user", "error", err)
 	}
-	return u, nil
+	return err
 }
 
-func (r *tracedRepository) FindAll() ([]*user.User, error) {
-	_, span := r.tracer.Start(context.Background(), "UserRepository.FindAll")
+func (t *tracedRepository) FindByID(ctx context.Context, id string) (*user.User, error) {
+	ctx, span := t.tracer.Start(ctx, "UserRepository.FindByID")
 	defer span.End()
 
-	users, err := r.repo.FindAll()
+	t.logger.Info(ctx, "finding user by id", "user_id", id)
+	u, err := t.repo.FindByID(ctx, id)
 	if err != nil {
 		span.RecordError(err)
-		return nil, err
+		t.logger.Error(ctx, "failed to find user by id", "error", err)
 	}
-	return users, nil
+	return u, err
 }
+
+func (t *tracedRepository) FindAll(ctx context.Context) ([]*user.User, error) {
+	ctx, span := t.tracer.Start(ctx, "UserRepository.FindAll")
+	defer span.End()
+
+	t.logger.Info(ctx, "listing users")
+	users, err := t.repo.FindAll(ctx)
+	if err != nil {
+		span.RecordError(err)
+		t.logger.Error(ctx, "failed to list users", "error", err)
+	}
+	return users, err
+}
+
+var _ output.UserRepository = (*tracedRepository)(nil)

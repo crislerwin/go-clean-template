@@ -1,0 +1,61 @@
+// Alloy config: coleta logs de containers Docker e envia para Loki.
+// Também expõe métricas do próprio Alloy na porta 12345.
+
+loki.write "default" {
+  endpoint {
+    name = "loki"
+    url  = "http://loki:3100/loki/api/v1/push"
+    batch_wait = "1s"
+  }
+}
+
+// Coleta de logs via Docker socket.
+local.file_match "logs" {
+  path_targets = [{
+    __address__ = "localhost",
+    __path__    = "/var/lib/docker/containers/*/*.log",
+    job         = "docker",
+  }]
+}
+
+loki.source.file "docker_logs" {
+  targets    = local.file_match.logs.targets
+  forward_to = [loki.process.docker_logs.receiver]
+  tail_from_end = true
+}
+
+loki.process "docker_logs" {
+  stage.json {
+    expressions = {
+      container_id = "attrs.container_id",
+      container_name = "attrs.container_name",
+    }
+  }
+
+  stage.labels {
+    values = {
+      container_name = "container_name",
+      container_id   = "container_id",
+    }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+// Métricas do Alloy.
+prometheus.scrape "default" {
+  targets    = [{ __address__ = "localhost:12345" }]
+  forward_to = [prometheus.remote_write.default.receiver]
+  job_name   = "alloy"
+}
+
+prometheus.remote_write "default" {
+  endpoint {
+    name = "mimir"
+    url  = "http://mimir:9009/api/v1/push"
+    queue_config {
+      capacity = 1000
+      max_samples_per_send = 100
+    }
+  }
+}

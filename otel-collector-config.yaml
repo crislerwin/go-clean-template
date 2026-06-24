@@ -10,21 +10,36 @@ processors:
   batch:
 
 exporters:
-  # Exemplo local: envia traces para stdout.
-  # Para enviar a um backend real, descomente e configure Jaeger/Zipkin/OTLP abaixo.
+  # Logs são enviados para Loki via OTLP.
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+  # Traces são enviados para Tempo.
+  otlphttp/tempo:
+    endpoint: http://tempo:3200/otlp
+    tls:
+      insecure: true
+  # Métricas são enviadas para Mimir.
+  prometheusremotewrite/mimir:
+    endpoint: http://mimir:9009/api/v1/push
+    tls:
+      insecure: true
+  # Fallback local: logs no stdout.
   logging:
     loglevel: debug
-
-  # Exemplo Jaeger (requer serviço jaeger-all-in-one na rede):
-  # otlp/jaeger:
-  #   endpoint: jaeger:4317
-  #   tls:
-  #     insecure: true
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [logging]
-      # Para Jaeger, troque exporters para: [otlp/jaeger]
+      exporters: [otlphttp/tempo]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/loki, logging]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheusremotewrite/mimir, logging]

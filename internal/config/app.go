@@ -11,4 +11,5 @@ import (
 type AppConfig struct {
 	UserRepository output.UserRepository
 	Tracer         telemetry.Tracer
+	Logger         telemetry.Logger
 }

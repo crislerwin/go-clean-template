@@ -1,7 +1,7 @@
-.PHONY: run test test-unit lint tidy install docker-build docker-run docker-compose-up docker-compose-down
+.PHONY: run test test-unit lint tidy install docker-build docker-run docker-compose-up docker-compose-down lgtm-up lgtm-down lgtm-logs lgtm-ps
 
 run:
-	go run ./cmd/api
+	LOG_LEVEL=${LOG_LEVEL:-INFO} OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-} go run ./cmd/api
 
 test:
 	go test -race ./...
@@ -32,7 +32,20 @@ docker-compose-up:
 docker-compose-down:
 	docker compose down
 
-# OpenTelemetry example (requires otel-collector service uncommented in docker-compose.yaml)
+# LGTM stack commands
+lgtm-up:
+	docker compose up --build -d
+
+lgtm-down:
+	docker compose down -v
+
+lgtm-logs:
+	docker compose logs -f api alloy otel-collector
+
+lgtm-ps:
+	docker compose ps
+
+# OpenTelemetry dev helpers
 otel-up:
 	OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4318 docker compose up --build -d
 

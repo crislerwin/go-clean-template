@@ -17,7 +17,7 @@ import (
 	"github.com/crislerwin/go-clean-template/internal/ports/telemetry"
 )
 
-// otelSpan adapota trace.Span para nossa interface interna.
+// otelSpan adapta trace.Span para nossa interface interna.
 type otelSpan struct {
 	span trace.Span
 }
