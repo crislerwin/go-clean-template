@@ -1,6 +1,6 @@
 module github.com/crislerwin/go-clean-template
 
-go 1.22
+go 1.27.1
 
 require (
 	github.com/google/uuid v1.6.0
